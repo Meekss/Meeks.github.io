@@ -60,13 +60,9 @@
     // ---------------------
     // 1. Configuration
     // ---------------------
-    // Replace with your PROJECT key, e.g. "sk-proj-XXXX..."
-    const OPENAI_API_KEY = "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";
+    const OPENAI_API_KEY = "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"; // Replace with your real API Key (not recommended on front-end!)
     const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-
-    // If your organization requires specifying an org or project ID, uncomment & set:
-    // const OPENAI_ORG_ID = "org-XXXXXXXX";
-    // const OPENAI_PROJECT_ID = "proj-XXXXXXXX";  // Rarely needed as a header
+    // For GPT-3.5 or GPT-4, you can use: "model": "gpt-3.5-turbo" or "gpt-4"
 
     // ---------------------
     // 2. DOM Elements
@@ -111,11 +107,13 @@
     // 4. Generate Questions (API call)
     // ---------------------
     async function generateQuestions(studyGuideText) {
+      // You can adjust the system prompt and user prompt
       const systemPrompt = {
         role: "system",
         content: "You are an AI that generates multiple choice quiz questions."
       };
 
+      // The user prompt instructs how to format the answer as JSON
       const userPrompt = {
         role: "user",
         content: `
@@ -145,45 +143,34 @@ Use this JSON structure with no extra keys or text.
       };
 
       try {
-        // Build headers
-        const headers = {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${OPENAI_API_KEY}`
-        };
-
-        // If needed, uncomment this:
-        // headers["OpenAI-Organization"] = OPENAI_ORG_ID;
-        // headers["OpenAI-Project"] = OPENAI_PROJECT_ID;
-
         const response = await fetch(OPENAI_ENDPOINT, {
           method: "POST",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`
+          },
           body: JSON.stringify({
             model: "gpt-3.5-turbo",
             messages: [systemPrompt, userPrompt],
-            max_tokens: 13000,
+            max_tokens: 3000,
             temperature: 0.7
           })
         });
 
-        // Check if request was successful
-        if (!response.ok) {
-          console.error("OpenAI API Error:", response.status, response.statusText);
-          return null;
-        }
-
         const data = await response.json();
+
+        // The assistant's reply should contain raw JSON in "data.choices[0].message.content".
         const textResponse = data.choices?.[0]?.message?.content.trim();
         if (!textResponse) {
           return null;
         }
 
-        // Parse the JSON from the model
+        // Attempt to parse the JSON
         try {
           const jsonData = JSON.parse(textResponse);
           return jsonData;
-        } catch (parseError) {
-          console.error("Failed to parse JSON from the response:", parseError, textResponse);
+        } catch (error) {
+          console.error("Failed to parse JSON from the response:", error, textResponse);
           return null;
         }
 
