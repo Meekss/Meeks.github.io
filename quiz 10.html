@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Study Guide Quiz Generator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+    }
+    #studyGuideInput {
+      width: 100%;
+      height: 100px;
+    }
+    #questionsContainer {
+      margin-top: 1rem;
+    }
+    .question-card {
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .option {
+      display: block;
+      margin: 0.25rem 0;
+      cursor: pointer;
+    }
+    .option.correct {
+      background-color: #d4edda; /* Light green */
+    }
+    .option.incorrect {
+      background-color: #f8d7da; /* Light red */
+    }
+    .explanation {
+      margin-top: 0.5rem;
+      font-style: italic;
+      color: #333;
+    }
+    #refreshBtn {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Study Guide Quiz Generator</h1>
+
+  <label for="studyGuideInput">Paste your study guide here:</label><br />
+  <textarea id="studyGuideInput"></textarea>
+  <br />
+  <button id="generateBtn">Generate Questions</button>
+
+  <div id="questionsContainer"></div>
+
+  <button id="refreshBtn" style="display: none;">Generate Another 10 Questions</button>
+
+  <script>
+    // ---------------------
+    // 1. Configuration
+    // ---------------------
+    const OPENAI_API_KEY = "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"; // Replace with your real API Key (not recommended on front-end!)
+    const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+    // For GPT-3.5 or GPT-4, you can use: "model": "gpt-3.5-turbo" or "gpt-4"
+
+    // ---------------------
+    // 2. DOM Elements
+    // ---------------------
+    const studyGuideInput = document.getElementById("studyGuideInput");
+    const generateBtn = document.getElementById("generateBtn");
+    const questionsContainer = document.getElementById("questionsContainer");
+    const refreshBtn = document.getElementById("refreshBtn");
+
+    // ---------------------
+    // 3. Event Listeners
+    // ---------------------
+    generateBtn.addEventListener("click", async () => {
+      const studyGuideText = studyGuideInput.value.trim();
+      if (!studyGuideText) {
+        alert("Please paste your study guide before generating questions.");
+        return;
+      }
+      // Clear old questions
+      questionsContainer.innerHTML = "";
+
+      // Call the function to generate questions
+      const quizData = await generateQuestions(studyGuideText);
+
+      if (quizData && quizData.questions) {
+        renderQuestions(quizData.questions);
+        refreshBtn.style.display = "inline-block"; // Show the refresh button
+      } else {
+        questionsContainer.innerHTML = "<p>Unable to generate questions. Please try again.</p>";
+      }
+    });
+
+    refreshBtn.addEventListener("click", () => {
+      // Clear everything and re-generate
+      questionsContainer.innerHTML = "";
+      refreshBtn.style.display = "none";
+      // Reuse the generate button handler
+      generateBtn.click();
+    });
+
+    // ---------------------
+    // 4. Generate Questions (API call)
+    // ---------------------
+    async function generateQuestions(studyGuideText) {
+      // You can adjust the system prompt and user prompt
+      const systemPrompt = {
+        role: "system",
+        content: "You are an AI that generates multiple choice quiz questions."
+      };
+
+      // The user prompt instructs how to format the answer as JSON
+      const userPrompt = {
+        role: "user",
+        content: `
+I have the following study guide:
+
+---
+${studyGuideText}
+---
+
+Please create exactly 10 multiple-choice questions (with 4 options each).
+Provide the questions in strict JSON format:
+
+{
+  "questions": [
+    {
+      "question": "Question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswerIndex": 0,
+      "explanation": "Brief explanation here"
+    },
+    ...
+  ]
+}
+
+Use this JSON structure with no extra keys or text.
+        `
+      };
+
+      try {
+        const response = await fetch(OPENAI_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [systemPrompt, userPrompt],
+            max_tokens: 3000,
+            temperature: 0.7
+          })
+        });
+
+        const data = await response.json();
+
+        // The assistant's reply should contain raw JSON in "data.choices[0].message.content".
+        const textResponse = data.choices?.[0]?.message?.content.trim();
+        if (!textResponse) {
+          return null;
+        }
+
+        // Attempt to parse the JSON
+        try {
+          const jsonData = JSON.parse(textResponse);
+          return jsonData;
+        } catch (error) {
+          console.error("Failed to parse JSON from the response:", error, textResponse);
+          return null;
+        }
+
+      } catch (error) {
+        console.error("Error calling OpenAI API:", error);
+        return null;
+      }
+    }
+
+    // ---------------------
+    // 5. Render Questions
+    // ---------------------
+    function renderQuestions(questions) {
+      questions.forEach((q, questionIndex) => {
+        const questionCard = document.createElement("div");
+        questionCard.className = "question-card";
+
+        const questionText = document.createElement("h3");
+        questionText.textContent = `Q${questionIndex + 1}: ${q.question}`;
+        questionCard.appendChild(questionText);
+
+        q.options.forEach((optionText, optionIndex) => {
+          const option = document.createElement("div");
+          option.className = "option";
+          option.textContent = optionText;
+
+          option.addEventListener("click", () => {
+            // Check correctness
+            const isCorrect = optionIndex === q.correctAnswerIndex;
+            option.classList.add(isCorrect ? "correct" : "incorrect");
+
+            // Disable further clicks on all options
+            Array.from(option.parentNode.querySelectorAll(".option")).forEach(o => {
+              o.style.pointerEvents = "none";
+            });
+
+            // Show explanation
+            const explanation = document.createElement("div");
+            explanation.className = "explanation";
+            explanation.textContent = `Explanation: ${q.explanation}`;
+            questionCard.appendChild(explanation);
+          });
+
+          questionCard.appendChild(option);
+        });
+
+        questionsContainer.appendChild(questionCard);
+      });
+    }
+  </script>
+</body>
+</html>
