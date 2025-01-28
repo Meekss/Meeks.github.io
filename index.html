@@ -60,9 +60,9 @@
     // ---------------------
     // 1. Configuration
     // ---------------------
-    const OPENAI_API_KEY = "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"; // Replace with your real API Key (not recommended on front-end!)
+    // WARNING: DO NOT EXPOSE REAL KEYS IN PRODUCTION FRONT-END!
+    const OPENAI_API_KEY = "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"; // Replace with your real key; e.g. "sk-..."
     const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-    // For GPT-3.5 or GPT-4, you can use: "model": "gpt-3.5-turbo" or "gpt-4"
 
     // ---------------------
     // 2. DOM Elements
@@ -147,6 +147,7 @@ Use this JSON structure with no extra keys or text.
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            // Must include 'Bearer <API_KEY>' in the Authorization header
             Authorization: `Bearer ${OPENAI_API_KEY}`
           },
           body: JSON.stringify({
@@ -157,9 +158,15 @@ Use this JSON structure with no extra keys or text.
           })
         });
 
+        // If response is unauthorized (401), it means the key is missing/invalid
+        if (!response.ok) {
+          console.error("OpenAI API Error:", response.status, response.statusText);
+          return null;
+        }
+
         const data = await response.json();
 
-        // The assistant's reply should contain raw JSON in "data.choices[0].message.content".
+        // The assistant's reply should contain raw JSON in "data.choices[0].message.content"
         const textResponse = data.choices?.[0]?.message?.content.trim();
         if (!textResponse) {
           return null;
@@ -169,8 +176,8 @@ Use this JSON structure with no extra keys or text.
         try {
           const jsonData = JSON.parse(textResponse);
           return jsonData;
-        } catch (error) {
-          console.error("Failed to parse JSON from the response:", error, textResponse);
+        } catch (parseError) {
+          console.error("Failed to parse JSON from the response:", parseError, textResponse);
           return null;
         }
 
