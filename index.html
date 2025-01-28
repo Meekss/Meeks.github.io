@@ -60,9 +60,13 @@
     // ---------------------
     // 1. Configuration
     // ---------------------
-    // WARNING: DO NOT EXPOSE REAL KEYS IN PRODUCTION FRONT-END!
-    const OPENAI_API_KEY = "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"; // Replace with your real key; e.g. "sk-..."
+    // Replace with your PROJECT key, e.g. "sk-proj-XXXX..."
+    const OPENAI_API_KEY = "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";
     const OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+
+    // If your organization requires specifying an org or project ID, uncomment & set:
+    // const OPENAI_ORG_ID = "org-XXXXXXXX";
+    // const OPENAI_PROJECT_ID = "proj-XXXXXXXX";  // Rarely needed as a header
 
     // ---------------------
     // 2. DOM Elements
@@ -107,13 +111,11 @@
     // 4. Generate Questions (API call)
     // ---------------------
     async function generateQuestions(studyGuideText) {
-      // You can adjust the system prompt and user prompt
       const systemPrompt = {
         role: "system",
         content: "You are an AI that generates multiple choice quiz questions."
       };
 
-      // The user prompt instructs how to format the answer as JSON
       const userPrompt = {
         role: "user",
         content: `
@@ -143,13 +145,19 @@ Use this JSON structure with no extra keys or text.
       };
 
       try {
+        // Build headers
+        const headers = {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENAI_API_KEY}`
+        };
+
+        // If needed, uncomment this:
+        // headers["OpenAI-Organization"] = OPENAI_ORG_ID;
+        // headers["OpenAI-Project"] = OPENAI_PROJECT_ID;
+
         const response = await fetch(OPENAI_ENDPOINT, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            // Must include 'Bearer <API_KEY>' in the Authorization header
-            Authorization: `Bearer ${OPENAI_API_KEY}`
-          },
+          headers,
           body: JSON.stringify({
             model: "gpt-3.5-turbo",
             messages: [systemPrompt, userPrompt],
@@ -158,21 +166,19 @@ Use this JSON structure with no extra keys or text.
           })
         });
 
-        // If response is unauthorized (401), it means the key is missing/invalid
+        // Check if request was successful
         if (!response.ok) {
           console.error("OpenAI API Error:", response.status, response.statusText);
           return null;
         }
 
         const data = await response.json();
-
-        // The assistant's reply should contain raw JSON in "data.choices[0].message.content"
         const textResponse = data.choices?.[0]?.message?.content.trim();
         if (!textResponse) {
           return null;
         }
 
-        // Attempt to parse the JSON
+        // Parse the JSON from the model
         try {
           const jsonData = JSON.parse(textResponse);
           return jsonData;
